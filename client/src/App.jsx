@@ -1,35 +1,32 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { useState } from "react";
 
-function App() {
-  const [count, setCount] = useState(0)
+export default function App() {
+  const [fileURL, setFileURL] = useState("");
+
+  const handleFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // create a temporary URL so we can preview the image
+    const url = URL.createObjectURL(file);
+    setFileURL(url);
+  };
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
-}
+    <div style={{ padding: 24, fontFamily: "system-ui, sans-serif" }}>
+      <h1>Image Classifier (Step 2: Upload + Preview)</h1>
 
-export default App
+      <input type="file" accept="image/*" onChange={handleFile} />
+
+      {fileURL && (
+        <div style={{ marginTop: 16 }}>
+          <p>Preview:</p>
+          <img
+            src={fileURL}
+            alt="preview"
+            style={{ width: 200, height: 200, objectFit: "contain", border: "1px solid #ccc", borderRadius: 8 }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
