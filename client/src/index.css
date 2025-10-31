@@ -1,11 +1,11 @@
 *{box-sizing:border-box}
 body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;margin:0;background:#0b1220;color:#e6e9ef}
-.header{padding:24px;text-align:center;background:linear-gradient(135deg,#1f2a44,#141a2e);box-shadow:0 2px 16px rgba(0,0,0,.35)}
+.header{padding:24px;text-align:center;background:linear-gradient(135deg,#ff0000,#de1313);box-shadow:0 2px 16px rgba(0,0,0,.35)}
 .header h1{margin:0;font-size:28px}
 .container{max-width:900px;margin:32px auto;padding:24px;background:#151a2b;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.4)}
 .card{background:#0f1423;border:1px solid #27304a;border-radius:16px;padding:20px;margin-bottom:20px}
 input[type=file]{display:block;padding:12px;width:100%;border:1px dashed #33406a;border-radius:10px;background:#0d1322;color:#e6e9ef}
 .preview{display:grid;gap:16px;grid-template-columns:160px 1fr;margin-top:16px}
 .preview img{width:160px;height:160px;object-fit:contain;border-radius:12px;border:1px solid #33406a}
-.badge{display:inline-block;padding:6px 10px;border-radius:999px;background:#1f2742;border:1px solid #33406a;font-size:12px}
+.badge{display:inline-block;padding:6px 10px;border-radius:999px;background:#56be06;border:1px solid #33406a;font-size:12px}
 .prob{padding:8px 12px;border:1px solid #33406a;border-radius:10px;background:#0d1322;margin-bottom:8px}
