@@ -18,3 +18,37 @@ input[type=file]{display:block;padding:12px;width:100%;border:1px dashed #33406a
   margin:0;
   text-align:center;
 }
+/* Simple toolbar for the live controls */
+.toolbar {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0 12px;
+  align-items: center;
+}
+
+/* Webcam preview box */
+.webcam {
+  width: 100%;
+  max-width: 480px;
+  aspect-ratio: 4/3;
+  background: #111;
+  border: 1px solid #333;
+  border-radius: 12px;
+  overflow: hidden;
+  margin: 8px 0 12px;
+}
+.video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Buttons (primary + secondary) */
+.btn.secondary {
+  background: #2c2c2c;
+  border: 1px solid #444;
+}
+.btn.secondary:hover {
+  filter: none;
+  background: #3a3a3a;
+}
