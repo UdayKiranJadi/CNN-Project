@@ -9,3 +9,12 @@ input[type=file]{display:block;padding:12px;width:100%;border:1px dashed #33406a
 .preview img{width:160px;height:160px;object-fit:contain;border-radius:12px;border:1px solid #33406a}
 .badge{display:inline-block;padding:6px 10px;border-radius:999px;background:#56be06;border:1px solid #33406a;font-size:12px}
 .prob{padding:8px 12px;border:1px solid #33406a;border-radius:10px;background:#0d1322;margin-bottom:8px}
+/* Error banner (simple, readable) */
+.error{
+  background:#3b0f13;
+  color:#ffdfe1;
+  border:1px solid #8a2a31;
+  padding:12px 16px;
+  margin:0;
+  text-align:center;
+}
