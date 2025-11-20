@@ -1,4 +1,4 @@
 export const CIFAR10_LABELS = [
-  "airplane","automobile","bird","cat","deer",
-  "dog","frog","horse","ship","truck"
+  "Aeroplane","Automobile","Bird","Cat","Deer",
+  "Dog","Frog","Horse","Ship","Truck"
 ];

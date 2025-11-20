@@ -1,128 +1,269 @@
-# File: training/model_creation.py
-# Purpose: Train a small CNN on CIFAR-10 and save a Keras model for later TF.js conversion.
 
-import os                                   # work with file paths
-import json                                 # save class labels as JSON
-import tensorflow as tf                     # TensorFlow (Keras included)
-from tensorflow.keras import layers, models, callbacks  # Keras API parts
+
+import os
+import json
+import shutil
+import tensorflow as tf
+from tensorflow.keras import layers, models, callbacks
 
 # --- Paths ---
-BASE_DIR = os.path.dirname(__file__)        # folder that contains this script
-MODEL_DIR = os.path.join(BASE_DIR, "model") # folder to store the trained model files
-os.makedirs(MODEL_DIR, exist_ok=True)       # create the folder if it doesn't exist
+BASE_DIR = os.path.dirname(__file__)                  # folder containing this script
+MODEL_DIR = os.path.join(BASE_DIR, "model")           # output folder
+os.makedirs(MODEL_DIR, exist_ok=True)
 
-MODEL_PATH = os.path.join(MODEL_DIR, "image_classifier.keras")  # final Keras model path
-LABELS_PATH = os.path.join(MODEL_DIR, "labels.json")            # class labels JSON path
+MODEL_PATH = os.path.join(MODEL_DIR, "image_classifier.keras")
+BEST_PATH = os.path.join(MODEL_DIR, "image_classifier_best.keras")
+MANIFEST_PATH = os.path.join(MODEL_DIR, "best_manifest.json")
+LABELS_PATH = os.path.join(MODEL_DIR, "labels.json")
 
 # CIFAR-10 class names in index order
-CLASS_NAMES = ["airplane", "automobile", "bird", "cat", "deer",
-               "dog", "frog", "horse", "ship", "truck"]
+CLASS_NAMES = [
+    "airplane", "automobile", "bird", "cat", "deer",
+    "dog", "frog", "horse", "ship", "truck"
+]
 
-def build_model():
-    """Build and compile a small CNN for 32x32x3 images (CIFAR-10)."""
-    model = models.Sequential([                 # FIX: models.Sequential (not model.Sequential)
-        layers.Input(shape=(32, 32, 3)),        # input is 32x32 RGB
-        layers.Rescaling(1.0 / 255.0),          # FIX: Rescaling (not Rescaleing) -> normalize to [0,1]
+SEED = 1337
+BATCH_SIZE = 128
+EPOCHS = 40  # EarlyStopping will stop earlier if no improvement
 
-        # Block 1
-        layers.Conv2D(32, 3, padding="same"),   # conv layer
-        layers.BatchNormalization(),            # stabilize training
-        layers.Activation("relu"),              # FIX: Activation (not Actvation)
-        layers.Conv2D(32, 3, padding="same", activation="relu"),
-        layers.MaxPooling2D(),
-        layers.Dropout(0.25),
 
-        # Block 2
-        layers.Conv2D(64, 3, padding="same"),
-        layers.BatchNormalization(),
-        layers.Activation("relu"),
-        layers.Conv2D(64, 3, padding="same", activation="relu"), # add second conv for symmetry
-        layers.MaxPooling2D(),
-        layers.Dropout(0.25),
-
-        # Block 3
-        layers.Conv2D(128, 3, padding="same"),
-        layers.BatchNormalization(),
-        layers.Activation("relu"),
-        layers.Conv2D(128, 3, padding="same", activation="relu"),
-        layers.MaxPooling2D(),
-        layers.Dropout(0.25),
-
-        layers.Flatten(),                       # flatten feature maps
-        layers.Dense(256, activation="relu"),   # dense layer
-        layers.Dropout(0.5),                    # regularize
-        layers.Dense(10, activation="softmax")  # 10 classes -> class probabilities
-    ])
-
-    model.compile(                              # compile with optimizer/loss/metrics
-        optimizer=tf.keras.optimizers.Adam(1e-3),
-        loss="sparse_categorical_crossentropy",
-        metrics=["accuracy"]
-    )
-    return model
-
-def main():
-    """Load CIFAR-10, train, and save model + labels."""
-    # Optional: let TF use GPU memory gradually (safe if no GPU)
+def set_memory_growth() -> None:
+    """Allow TF to allocate GPU memory on-demand (safe no-op if no GPU)."""
     for gpu in tf.config.list_physical_devices("GPU"):
         try:
             tf.config.experimental.set_memory_growth(gpu, True)
         except Exception:
             pass
 
-    print("[INFO] Loading CIFAR-10...")
+
+def set_seed(seed: int = 1337) -> None:
+    """Set global seeds for reproducibility (as much as practical)."""
+    tf.keras.utils.set_random_seed(seed)
+
+
+def build_model() -> tf.keras.Model:
+    """Build and compile a small 32x32 CNN with an in-graph 1/255 Rescaling layer."""
+    model = models.Sequential(
+        [
+            layers.Input(shape=(32, 32, 3)),
+            layers.Rescaling(1.0 / 255.0, name="rescaling"),
+
+            # Block 1
+            layers.Conv2D(32, 3, padding="same"),
+            layers.BatchNormalization(),
+            layers.Activation("relu"),
+            layers.Conv2D(32, 3, padding="same", activation="relu"),
+            layers.MaxPooling2D(),
+            layers.Dropout(0.25),
+
+            # Block 2
+            layers.Conv2D(64, 3, padding="same"),
+            layers.BatchNormalization(),
+            layers.Activation("relu"),
+            layers.Conv2D(64, 3, padding="same", activation="relu"),
+            layers.MaxPooling2D(),
+            layers.Dropout(0.25),
+
+            # Block 3
+            layers.Conv2D(128, 3, padding="same"),
+            layers.BatchNormalization(),
+            layers.Activation("relu"),
+            layers.Conv2D(128, 3, padding="same", activation="relu"),
+            layers.MaxPooling2D(),
+            layers.Dropout(0.25),
+
+            layers.Flatten(),
+            layers.Dense(256, activation="relu"),
+            layers.Dropout(0.5),
+            layers.Dense(10, activation="softmax"),
+        ]
+    )
+
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(1e-3),
+        loss="sparse_categorical_crossentropy",
+        metrics=["accuracy"],
+    )
+    return model
+
+
+def build_datasets(batch_size: int = 128, seed: int = 1337):
+    """Create train/validation tf.data pipelines with light augmentation on training."""
     (x_train, y_train), (x_test, y_test) = tf.keras.datasets.cifar10.load_data()
-    y_train = y_train.squeeze()                 # shape (N,)
+    y_train = y_train.squeeze()
     y_test = y_test.squeeze()
 
-    print("[INFO] Building data pipeline...")
-    aug = tf.keras.Sequential([                 # light augmentation
-        layers.RandomFlip("horizontal"),
-        layers.RandomRotation(0.05),
-        layers.RandomZoom(0.1),
-    ])
+    aug = tf.keras.Sequential(
+        [
+            layers.RandomFlip("horizontal"),
+            layers.RandomRotation(0.05),
+            layers.RandomZoom(0.10),
+            layers.RandomContrast(0.10),
+        ],
+        name="augment",
+    )
 
-    print("[INFO] Building model...")
-    model = build_model()
+    def map_train(x, y):
+        x = tf.cast(x, tf.float32)         # model will rescale 1/255
+        x = aug(x, training=True)
+        return x, y
 
-    batch_size = 128                            # batch size
-    epochs = 15                                 # number of epochs
+    def map_val(x, y):
+        x = tf.cast(x, tf.float32)
+        return x, y
 
-    # tf.data pipelines for performance
-    train_ds = (tf.data.Dataset
-                .from_tensor_slices((x_train, y_train))
-                .shuffle(50000)
-                .batch(batch_size)
-                .prefetch(tf.data.AUTOTUNE))
-    train_ds = train_ds.map(lambda x, y: (aug(tf.cast(x, tf.float32)), y))
+    autotune = tf.data.AUTOTUNE
 
-    val_ds = (tf.data.Dataset
-              .from_tensor_slices((x_test, y_test))
-              .batch(batch_size)
-              .prefetch(tf.data.AUTOTUNE))
+    train_ds = (
+        tf.data.Dataset.from_tensor_slices((x_train, y_train))
+        .shuffle(buffer_size=50000, seed=seed, reshuffle_each_iteration=True)
+        .map(map_train, num_parallel_calls=autotune)
+        .batch(batch_size)
+        .prefetch(autotune)
+    )
 
-    cbs = [                                     # callbacks: save best + early stop
-        callbacks.ModelCheckpoint(MODEL_PATH, monitor="val_accuracy", save_best_only=True),
-        callbacks.EarlyStopping(monitor="val_accuracy", patience=5, restore_best_weights=True),
+    val_ds = (
+        tf.data.Dataset.from_tensor_slices((x_test, y_test))
+        .map(map_val, num_parallel_calls=autotune)
+        .batch(batch_size)
+        .prefetch(autotune)
+    )
+
+    return train_ds, val_ds
+
+
+def train_model(model: tf.keras.Model, train_ds, val_ds, epochs: int, model_path: str):
+    """Train the model with callbacks: save-best, early-stopping, and LR reduction."""
+    cbs = [
+        callbacks.ModelCheckpoint(
+            filepath=model_path,
+            monitor="val_accuracy",
+            mode="max",
+            save_best_only=True,
+            save_weights_only=False,
+        ),
+        callbacks.EarlyStopping(
+            monitor="val_accuracy",
+            patience=8,
+            restore_best_weights=True,
+            mode="max",
+        ),
+        callbacks.ReduceLROnPlateau(
+            monitor="val_loss",
+            factor=0.5,
+            patience=4,
+            verbose=1,
+        ),
     ]
 
-    print("[INFO] Training...")
-    model.fit(train_ds, validation_data=val_ds, epochs=epochs, callbacks=cbs, verbose=1)
+    history = model.fit(
+        train_ds,
+        validation_data=val_ds,
+        epochs=epochs,
+        callbacks=cbs,
+        verbose=1,
+    )
+    return history
 
-    print("[INFO] Evaluating...")
-    val_loss, val_acc = model.evaluate(val_ds, verbose=0)
+
+def evaluate_model(model: tf.keras.Model, val_ds) -> float:
+    """Evaluate the (restored-best) model on validation set and return accuracy."""
+    _, val_acc = model.evaluate(val_ds, verbose=0)
+    return float(val_acc)
+
+
+def save_labels(labels_path: str, class_names) -> None:
+    """Write class label names to JSON for reference/conversion."""
+    with open(labels_path, "w") as f:
+        json.dump(list(class_names), f, indent=2)
+
+
+def ensure_model_exists(model: tf.keras.Model, model_path: str) -> None:
+    """If checkpoint did not trigger (edge case), save the current model snapshot."""
+    if not os.path.exists(model_path):
+        model.save(model_path)
+
+
+def keep_best_across_runs(
+    this_run_best_path: str,
+    global_best_path: str,
+    manifest_path: str,
+    history: tf.keras.callbacks.History,
+    fallback_val_acc: float,
+) -> None:
+    """
+    Maintain a persistent 'best across runs' copy using val_accuracy.
+
+    - Reads previous best score from MANIFEST (if any).
+    - Gets this run's best val_accuracy from history (fallback to evaluate()).
+    - If improved, copies this run's best model to global_best_path and updates MANIFEST.
+    """
+    # Prefer the best val_accuracy seen during this run
+    try:
+        val_hist = history.history.get("val_accuracy", [])
+        this_best = float(max(val_hist)) if val_hist else float(fallback_val_acc)
+    except Exception:
+        this_best = float(fallback_val_acc)
+
+    prev = {"score": -1.0}
+    if os.path.exists(manifest_path):
+        try:
+            with open(manifest_path, "r") as f:
+                prev = json.load(f)
+        except Exception:
+            prev = {"score": -1.0}
+
+    prev_score = float(prev.get("score", -1.0))
+
+    if os.path.exists(this_run_best_path) and this_best > prev_score:
+        shutil.copy2(this_run_best_path, global_best_path)
+        with open(manifest_path, "w") as f:
+            json.dump(
+                {"metric": "val_accuracy", "score": this_best, "path": global_best_path},
+                f,
+                indent=2,
+            )
+        print(f"[BEST] New global best saved → {global_best_path} (val_acc={this_best:.4f})")
+    else:
+        print(f"[BEST] Kept previous global best (val_acc={prev_score:.4f})")
+
+
+def main() -> None:
+    """Orchestrate: seeds, data, model, training, evaluation, and saving artifacts."""
+    set_memory_growth()
+    set_seed(SEED)
+
+    print("[INFO] Building datasets…")
+    train_ds, val_ds = build_datasets(batch_size=BATCH_SIZE, seed=SEED)
+
+    print("[INFO] Building model…")
+    model = build_model()
+    model.summary()
+
+    print("[INFO] Training…")
+    history = train_model(model, train_ds, val_ds, epochs=EPOCHS, model_path=MODEL_PATH)
+
+    print("[INFO] Evaluating best weights…")
+    val_acc = evaluate_model(model, val_ds)
     print(f"[INFO] Validation accuracy: {val_acc:.4f}")
 
-    print("[INFO] Saving labels...")
-    with open(LABELS_PATH, "w") as f:
-        json.dump(CLASS_NAMES, f)
+    print("[INFO] Saving labels…")
+    save_labels(LABELS_PATH, CLASS_NAMES)
 
-    # Ensure model exists even if checkpoint didn’t trigger (edge case)
-    if not os.path.exists(MODEL_PATH):
-        print("[INFO] Saving final model...")
-        model.save(MODEL_PATH)
+    # Ensure a model exists on disk even if checkpoint didn't fire (rare)
+    ensure_model_exists(model, MODEL_PATH)
+
+    # Keep best-across-runs model beside the per-run best
+    keep_best_across_runs(
+        this_run_best_path=MODEL_PATH,
+        global_best_path=BEST_PATH,
+        manifest_path=MANIFEST_PATH,
+        history=history,
+        fallback_val_acc=val_acc,
+    )
 
     print("[INFO] Done. Files saved to:", MODEL_DIR)
 
-if __name__ == "__main__":                      # run main() only if script executed directly
+
+if __name__ == "__main__":
     main()

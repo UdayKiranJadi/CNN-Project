@@ -1,0 +1,5 @@
+{
+  "metric": "val_accuracy",
+  "score": 0.8075000047683716,
+  "path": "/Users/udaykiranjadi/CNN-Project/training/model/image_classifier_best.keras"
+}

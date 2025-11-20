@@ -1,0 +1,29 @@
+# macOS
+.DS_Store
+
+# Node / Vite
+node_modules/
+client/node_modules/
+client/.vite/
+client/dist/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.venvs/
+env/
+venv/
+.conda/
+
+# IDE/Editor
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Training artifacts (optional: keep TFJS model, skip big training files)
+training/model/*.h5
+training/model/*.keras
+training/.cache/

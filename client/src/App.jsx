@@ -1,223 +1,257 @@
-// File: client/src/App.jsx                       // Main UI component
-// Purpose: Upload image OR use webcam "Live mode", load TF.js model, predict continuously.
+// File: client/src/App.jsx
 
-import { useState, useRef, useEffect } from "react";  // React hooks for state/refs/effects
-import * as tf from "@tensorflow/tfjs";               // TensorFlow.js runtime in the browser
-import { CIFAR10_LABELS } from "./lib/labels";        // CIFAR-10 label names
-import "./index.css";                                 // Global styles (header, banner, etc.)
+import { useState, useRef, useEffect } from "react";
+import * as tf from "@tensorflow/tfjs";
+import * as cocoSsd from "@tensorflow-models/coco-ssd";
+import { CIFAR10_LABELS } from "./lib/labels";
+import "./index.css";
 
+/** Root component: loads models, handles upload/webcam, runs human detection and CIFAR-10 classification. */
 export default function App() {
-  // ---------- App state ----------
-  const [fileURL, setFileURL] = useState("");         // Blob URL for still-image preview
-  const [model, setModel] = useState(null);           // Loaded TF.js model
-  const [status, setStatus] = useState("Idle");       // Human-readable status badge text
-  const [isWarming, setIsWarming] = useState(false);  // True while running warm-up pass
-  const [preds, setPreds] = useState([]);             // Top-5 predictions [{label, prob}]
-  const [error, setError] = useState("");             // Error banner text (empty = hidden)
+  const [fileURL, setFileURL] = useState("");
+  const [model, setModel] = useState(null);
+  const [detModel, setDetModel] = useState(null);
+  const [status, setStatus] = useState("Idle");
+  const [isWarming, setIsWarming] = useState(false);
+  const [preds, setPreds] = useState([]);
+  const [human, setHuman] = useState({ present: false, score: 0 });
+  const [error, setError] = useState("");
 
-  // ---------- DOM refs ----------
-  const canvasRef = useRef(null);                     // Hidden <canvas> used to resize to 32x32
-  const imgRef = useRef(null);                        // <img> preview for still uploads
-  const videoRef = useRef(null);                      // <video> for live webcam preview
+  const imgRef = useRef(null);
+  const canvasRef = useRef(null);
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
+  const rafIdRef = useRef(null);
+  const lastTsRef = useRef(0);
+  const humanRef = useRef({ present: false, score: 0 });
+  useEffect(() => { humanRef.current = human; }, [human]);
 
-  // ---------- Live mode control ----------
-  const [isLive, setIsLive] = useState(false);        // True when webcam live mode is active
-  const streamRef = useRef(null);                     // Holds MediaStream so we can stop tracks
-  const rafIdRef = useRef(null);                      // requestAnimationFrame id for the loop
-  const lastTsRef = useRef(0);                        // Timestamp to throttle FPS
+  const [isLive, setIsLive] = useState(false);
+  const detEveryN = useRef(6);
+  const detTick = useRef(0);
 
-  // ---------- Model loader (with fallbacks & error banner) ----------
+  /** One-time setup: choose backend, load TF.js classifier and COCO-SSD detector, warm the classifier. */
   useEffect(() => {
-    let isMounted = true;                             // Guard to avoid setState after unmount
-
-    async function loadModel() {
+    let isMounted = true;
+    (async () => {
       try {
-        const v = tf?.version_core || "unknown";      // Log TFJS version for debugging
-        setStatus(`Setting up backend (TFJS ${v})...`);
-        setError("");                                 // Clear any old error
-
-        // Prefer WebGL; fall back to CPU if it fails (browser/driver issues)
+        setError("");
+        const v = tf?.version?.tfjs ?? "unknown";
+        setStatus(`Setting up backend (TFJS ${v})…`);
         try {
           await tf.setBackend("webgl");
           await tf.ready();
         } catch {
-          setStatus(`WebGL failed; using CPU (TFJS ${v})...`);
+          setStatus(`WebGL failed; falling back to CPU (TFJS ${v})…`);
           await tf.setBackend("cpu");
           await tf.ready();
         }
 
-        // Try a few URL candidates in case path/base changes
-        const base = window.location.origin;
-        const urls = ["/model/model.json", "model/model.json", `${base}/model/model.json`];
+        setStatus("Loading classifier…");
+        const m = await tf.loadLayersModel(`/model/model.json?v=${Date.now()}`);
+        setIsWarming(true);
+        m.predict(tf.zeros([1, 32, 32, 3])).dispose();
+        setIsWarming(false);
+        if (!isMounted) return;
+        setModel(m);
+        setStatus("Classifier loaded ");
 
-        let lastErr = null;
-        for (const url of urls) {
-          try {
-            setStatus(`Loading model from ${url} ...`);
-            setError("");                             // Clear banner before each attempt
-            const m = await tf.loadLayersModel(url, {
-              requestInit: { cache: "no-store", credentials: "omit", mode: "cors" }, // no-cache
-            });
-
-            // Warm-up pass so first real inference is fast
-            setIsWarming(true);
-            setStatus("Warming up model...");
-            m.predict(tf.zeros([1, 32, 32, 3])).dispose(); // 1 dummy forward
-            setIsWarming(false);
-
-            if (isMounted) {
-              setModel(m);
-              setStatus("Model loaded ✅");
-            }
-            return;                                   // Success → stop trying others
-          } catch (e) {
-            lastErr = e;
-            console.warn("Failed to load from", url, e);
+        setStatus("Loading person detector…");
+        try {
+          const dm = await cocoSsd.load({ base: "lite_mobilenet_v2" });
+          if (isMounted) {
+            setDetModel(dm);
+            setStatus("Models loaded ");
           }
+        } catch (e) {
+          if (isMounted) setStatus("Classifier loaded (detector unavailable) ");
         }
-
-        // Nothing worked → throw to banner
-        throw lastErr || new Error("Model load failed for all candidates");
-      } catch (err) {
-        console.error("Model load error:", err);
+      } catch (e) {
         if (isMounted) {
-          setError(String(err?.message || err));      // Show exact error in banner
-          setStatus("No model found yet (we'll add it later) ⚠️");
+          setError(String(e?.message || e));
+          setStatus("No model found yet (we'll add it later) ");
         }
       }
-    }
-
-    loadModel();
-    return () => {                                    // Cleanup on unmount
+    })();
+    return () => {
       isMounted = false;
-      stopLiveInternal();                              // Ensure live mode is fully stopped
+      stopLiveInternal();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);                                             // Run once on mount
+  }, []);
 
-  // ---------- File input handler ----------
+  /** Draws the source into a 32×32 canvas using “contain” (letterbox). */
+  function drawContain(ctx, srcEl, srcW, srcH) {
+    const W = 32, H = 32;
+    const scale = Math.min(W / srcW, H / srcH);
+    const drawW = srcW * scale;
+    const drawH = srcH * scale;
+    const dx = (W - drawW) / 2;
+    const dy = (H - drawH) / 2;
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, W, H);
+    ctx.drawImage(srcEl, dx, dy, drawW, drawH);
+  }
+
+  /** Draws the source into a 32×32 canvas using “cover” (center crop). */
+  function drawCover(ctx, srcEl, srcW, srcH) {
+    const W = 32, H = 32;
+    const scale = Math.max(W / srcW, H / srcH);
+    const drawW = srcW * scale;
+    const drawH = srcH * scale;
+    const dx = (W - drawW) / 2;
+    const dy = (H - drawH) / 2;
+    ctx.clearRect(0, 0, W, H);
+    ctx.drawImage(srcEl, dx, dy, drawW, drawH);
+  }
+
+  /** Runs the classifier on the 32×32 canvas and returns top-2 predictions and max probability. */
+  function classifyFromCanvas(canvas, model) {
+    return tf.tidy(() => {
+      const input = tf.browser.fromPixels(canvas).toFloat().expandDims(0);
+      const out = model.predict(input);
+      const probs = out.dataSync();
+      const sorted = [...probs].map((p, i) => ({ i, p })).sort((a, b) => b.p - a.p);
+      const top2 = sorted.slice(0, 2).map(({ i, p }) => ({
+        label: CIFAR10_LABELS[i] ?? `class_${i}`,
+        prob: p,
+      }));
+      const maxP = sorted[0]?.p ?? 0;
+      return { top2, maxP };
+    });
+  }
+
+  /** Handles file selection for still image prediction. */
   const handleFile = (e) => {
-    const file = e.target.files?.[0];                 // First selected file
+    const file = e.target.files?.[0];
     if (!file) return;
-    setPreds([]);                                     // Clear old predictions
-    setError("");                                     // Clear error banner
-    const url = URL.createObjectURL(file);            // Correct API to create preview URL
-    setFileURL(url);                                  // Trigger <img> to render
+    setPreds([]);
+    setHuman({ present: false, score: 0 });
+    setError("");
+    const url = URL.createObjectURL(file);
+    setFileURL(url);
   };
 
-  // ---------- One-shot predict for still image ----------
-  const predict = () => {
+  /** Detects human first; if none, classifies the still image using the better of contain/cover. */
+  const predict = async () => {
     try {
       if (!model) { setStatus("Cannot predict: model not loaded"); return; }
-      if (!imgRef.current || !canvasRef.current) { setStatus("Cannot predict: image or canvas missing"); return; }
+      if (!imgRef.current || !canvasRef.current) { setStatus("Cannot predict: image/canvas missing"); return; }
 
-      const img = imgRef.current;                     // Source is the <img> element
-      const canvas = canvasRef.current;               // Draw into hidden canvas at 32x32
-      const ctx = canvas.getContext("2d");
-      const W = 32, H = 32;
-      canvas.width = W; canvas.height = H;
-
-      // Cover-fit (fill 32x32 without distortion)
-      const scale = Math.max(W / img.naturalWidth, H / img.naturalHeight);
-      const drawW = img.naturalWidth * scale;
-      const drawH = img.naturalHeight * scale;
-      const dx = (W - drawW) / 2;
-      const dy = (H - drawH) / 2;
-
-      ctx.clearRect(0, 0, W, H);
-      ctx.drawImage(img, dx, dy, drawW, drawH);
-
-      setStatus("Running inference...");
+      setStatus("Running inference…");
       setError("");
 
-      const top5 = tf.tidy(() => {                    // Auto-clean intermediate tensors
-        const input = tf.browser
-          .fromPixels(canvas)                         // [32,32,3]
-          .toFloat()                                  // uint8 → float32
-          .div(255)                                   // Normalize [0,1]
-          .expandDims(0);                             // [1,32,32,3]
+      if (detModel) {
+        try {
+          const dets = await detModel.detect(imgRef.current, 3);
+          const person = dets.find((d) => d.class === "person");
+          if (person) {
+            setHuman({ present: true, score: person.score });
+            setPreds([]);
+            setStatus("Human detected ");
+            return;
+          } else {
+            setHuman({ present: false, score: 0 });
+          }
+        } catch {}
+      }
 
-        const out = model.predict(input);             // Forward pass
-        const probs = out.dataSync();                 // Read probabilities
+      const img = imgRef.current;
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext("2d");
+      canvas.width = 32; canvas.height = 32;
 
-        return [...probs]
-          .map((p, i) => ({ i, p }))
-          .sort((a, b) => b.p - a.p)
-          .slice(0, 5)
-          .map(({ i, p }) => ({ label: CIFAR10_LABELS[i] ?? `class_${i}`, prob: p }));
-      });
+      drawContain(ctx, img, img.naturalWidth, img.naturalHeight);
+      const resContain = classifyFromCanvas(canvas, model);
 
-      setPreds(top5);
-      setStatus("Done ✅");
-    } catch (err) {
-      console.error("Predict error:", err);
-      setError(String(err?.message || err));
-      setStatus("Predict failed ❌");
+      drawCover(ctx, img, img.naturalWidth, img.naturalHeight);
+      const resCover = classifyFromCanvas(canvas, model);
+
+      const better = resContain.maxP >= resCover.maxP ? resContain : resCover;
+      setPreds(better.top2);
+      setStatus("Done ");
+    } catch (e) {
+      setError(String(e?.message || e));
+      setStatus("Predict failed ");
     }
   };
 
-  // ---------- Live mode: start webcam + loop ----------
+  /** Starts webcam stream and enters a live loop with periodic human detection. */
   const startLive = async () => {
     try {
       if (!model) { setError("Load the model first."); return; }
-      if (isLive) return;                              // If already live, ignore
+      if (isLive) return;
 
-      setError("");                                    // Clear errors
-      setPreds([]);                                    // Reset predictions
+      setError("");
+      setPreds([]);
+      setHuman({ present: false, score: 0 });
       setStatus("Requesting camera…");
 
-      // Ask for webcam; prefer back camera if available
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: "environment" }, width: { ideal: 640 }, height: { ideal: 480 } },
         audio: false,
       });
+      streamRef.current = stream;
+      const video = videoRef.current;
+      video.srcObject = stream;
+      await video.play();
 
-      streamRef.current = stream;                      // Save stream so we can stop tracks
-      const video = videoRef.current;                  // Our <video> element
-      video.srcObject = stream;                        // Attach stream to video
-      await video.play();                              // Start playback
-      setIsLive(true);                                 // Flip live flag
+      setIsLive(true);
       setStatus("Live mode: running…");
-
-      // Kick off the rAF loop
-      lastTsRef.current = 0;                           // Reset throttle timer
+      lastTsRef.current = 0;
+      detTick.current = 0;
       rafIdRef.current = requestAnimationFrame(liveLoop);
-    } catch (err) {
-      console.error("Live start error:", err);
-      setError(String(err?.message || err));
-      setStatus("Live start failed ❌");
-      stopLiveInternal();                              // Ensure cleanup if partially started
+    } catch (e) {
+      setError(String(e?.message || e));
+      setStatus("Live start failed ");
+      stopLiveInternal();
     }
   };
 
-  // ---------- Live mode: stop webcam + loop ----------
-  const stopLive = () => {
-    stopLiveInternal();                                // Centralized cleanup
-    setStatus("Live stopped ⏸");
-  };
+  /** Public stop handler for live mode. */
+  const stopLive = () => { stopLiveInternal(); setStatus("Live stopped ⏸"); };
 
-  // Internal: shared cleanup (used by stopLive and unmount)
-  const stopLiveInternal = () => {
-    // Cancel animation frame loop
-    if (rafIdRef.current) {
-      cancelAnimationFrame(rafIdRef.current);
-      rafIdRef.current = null;
-    }
-    // Stop camera tracks
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
-    // Reset live flag
+  /** Tears down the webcam stream and animation loop, and clears results. */
+  function stopLiveInternal() {
+    if (rafIdRef.current) { cancelAnimationFrame(rafIdRef.current); rafIdRef.current = null; }
+    if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
     if (isLive) setIsLive(false);
+    setHuman({ present: false, score: 0 });
+    setPreds([]);
+  }
+
+  /** Captures a single webcam frame and switches to still-image preview flow. */
+  const captureToPreview = async () => {
+    try {
+      if (!isLive || !videoRef.current) { setError("Start Live first, then capture a frame."); return; }
+      const v = videoRef.current;
+      const w = v.videoWidth || 640, h = v.videoHeight || 480;
+
+      const snap = document.createElement("canvas");
+      snap.width = w; snap.height = h;
+      const sctx = snap.getContext("2d");
+      sctx.drawImage(v, 0, 0, w, h);
+
+      await new Promise((resolve) => {
+        snap.toBlob((blob) => {
+          if (!blob) { setError("Could not capture a snapshot."); return resolve(); }
+          const url = URL.createObjectURL(blob);
+          stopLiveInternal();
+          setFileURL(url);
+          setPreds([]); setError("");
+          setStatus("Captured frame → ready to Predict");
+          resolve();
+        }, "image/png", 0.92);
+      });
+    } catch (e) {
+      setError(String(e?.message || e));
+    }
   };
 
-  // ---------- The live prediction loop (throttled) ----------
+  /** Animation loop for live mode: throttles, hides predictions when a human is present, refreshes detection. */
   const liveLoop = (ts) => {
-    // If not live or no DOM ready, bail
-    if (!isLive || !model || !videoRef.current || !canvasRef.current) return;
+    if (!isLive || !videoRef.current || !canvasRef.current) return;
 
-    // Throttle to ~8–12 FPS (here: run if ≥120ms elapsed)
     const last = lastTsRef.current || 0;
     if (ts - last < 120) {
       rafIdRef.current = requestAnimationFrame(liveLoop);
@@ -225,56 +259,44 @@ export default function App() {
     }
     lastTsRef.current = ts;
 
-    const video = videoRef.current;                    // Source: <video>
-    const canvas = canvasRef.current;                  // Resize target: hidden <canvas>
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
-    const W = 32, H = 32;
-    canvas.width = W; canvas.height = H;
+    canvas.width = 32; canvas.height = 32;
 
-    // Cover-fit video frame into 32x32 (use videoWidth/Height)
-    const scale = Math.max(W / video.videoWidth, H / video.videoHeight);
-    const drawW = video.videoWidth * scale;
-    const drawH = video.videoHeight * scale;
-    const dx = (W - drawW) / 2;
-    const dy = (H - drawH) / 2;
+    drawContain(ctx, video, video.videoWidth, video.videoHeight);
 
-    // Draw one frame onto the canvas
-    ctx.clearRect(0, 0, W, H);
-    ctx.drawImage(video, dx, dy, drawW, drawH);
-
-    // Predict (keep it small to avoid GC pressure)
-    try {
-      const top5 = tf.tidy(() => {
-        const input = tf.browser.fromPixels(canvas).toFloat().div(255).expandDims(0);
-        const out = model.predict(input);
-        const probs = out.dataSync();
-        return [...probs]
-          .map((p, i) => ({ i, p }))
-          .sort((a, b) => b.p - a.p)
-          .slice(0, 5)
-          .map(({ i, p }) => ({ label: CIFAR10_LABELS[i] ?? `class_${i}`, prob: p }));
-      });
-      setPreds(top5);                                  // Update UI with latest top-5
-    } catch (err) {
-      console.error("Live predict error:", err);
-      setError(String(err?.message || err));
-      stopLiveInternal();                              // Stop live to prevent runaway errors
-      setStatus("Live failed ❌");
-      return;
+    if (humanRef.current.present) {
+      if (preds.length) setPreds([]);
+    } else {
+      try {
+        const { top2 } = classifyFromCanvas(canvas, model);
+        setPreds(top2);
+      } catch (e) {
+        setError(String(e?.message || e));
+        stopLiveInternal();
+        setStatus("Live failed ");
+        return;
+      }
     }
 
-    // Schedule next frame
+    detTick.current = (detTick.current + 1) % detEveryN.current;
+    if (detTick.current === 0 && detModel) {
+      detModel.detect(video, 3)
+        .then(dets => {
+          const person = dets.find(d => d.class === "person");
+          setHuman({ present: !!person, score: person ? person.score : 0 });
+        })
+        .catch(() => {});
+    }
+
     rafIdRef.current = requestAnimationFrame(liveLoop);
   };
 
-  // ---------- UI ----------
   return (
     <>
-      {/* ERROR BANNER */}
       {error && (
-        <div className="error">
-          <strong>Error:</strong> {error}
-        </div>
+        <div className="error"><strong>Error:</strong> {error}</div>
       )}
 
       <div className="header">
@@ -286,53 +308,37 @@ export default function App() {
         <div className="card">
           <h2>Choose input</h2>
 
-          {/* Toolbar: still-image vs webcam */}
           <div className="toolbar">
-            <button
-              className="btn"
-              onClick={startLive}                       // Start webcam live mode
-              disabled={!model || isWarming || isLive} // Need model ready, not warming, not already live
-            >
-              {isLive ? "Live running…" : "Start Live (webcam)"}
+            <button className="btn" onClick={startLive} disabled={!model || isWarming || isLive}>
+              {isLive ? "Live running…" : "Start Webcam"}
             </button>
-
-            <button
-              className="btn secondary"
-              onClick={stopLive}                        // Stop webcam live
-              disabled={!isLive}
-            >
+            <button className="btn" onClick={captureToPreview} disabled={!isLive || isWarming}>
+              Capture 
+            </button>
+            <button className="btn secondary" onClick={stopLive} disabled={!isLive}>
               Stop Live
             </button>
           </div>
 
-          {/* Webcam preview (hidden until live) */}
           <div className="webcam" style={{ display: isLive ? "block" : "none" }}>
-            <video
-              ref={videoRef}                            // Bind the <video> element
-              autoPlay
-              playsInline                               // Avoid fullscreen on iOS
-              muted                                     // No audio needed
-              className="video"                         // Simple styling box
-            />
+            <video ref={videoRef} autoPlay playsInline muted className="video" />
           </div>
 
-          {/* Still image upload (disabled while live) */}
           <div style={{ marginTop: 12 }}>
             <h3>Or upload a single image</h3>
             <input
               type="file"
               accept="image/*"
               onChange={handleFile}
-              disabled={isLive || isWarming}            // Disable while live/warming
+              disabled={isLive || isWarming}
             />
           </div>
 
-          {/* Preview + Predict for still image */}
           {fileURL && !isLive && (
             <div className="preview">
               <img ref={imgRef} src={fileURL} alt="preview" />
               <div>
-                <h3>Predictions</h3>
+                <h3>Top-2 predictions</h3>
                 <button
                   onClick={predict}
                   disabled={!model || isWarming}
@@ -345,27 +351,26 @@ export default function App() {
             </div>
           )}
 
-          {/* Shared predictions list (works for both live & still) */}
           <div style={{ marginTop: 12 }}>
-            {preds.length ? (
+            <div style={{ marginBottom: 8, opacity: 0.95 }}>
+              <strong>Human:</strong>{" "}
+              {human.present ? `Yes (${(human.score * 100).toFixed(1)}%)` : "No"}
+            </div>
+
+            {!human.present && preds.length ? (
               <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
                 {preds.map((p, i) => (
                   <li key={i} className="prob">
-                    {p.label} — {p.prob.toFixed(4)}
+                    {p.label} — {(p.prob * 100).toFixed(1)}%
                   </li>
                 ))}
               </ul>
-            ) : (
-              <p>No predictions yet.</p>
-            )}
+            ) : (!human.present ? <p>No predictions yet.</p> : null)}
           </div>
 
-          {/* Hidden canvas used to resize to 32x32 for BOTH still + live */}
           <canvas ref={canvasRef} style={{ display: "none" }} />
 
-          <p style={{ opacity: 0.7, marginTop: 12 }}>
-            CIFAR-10 classes: airplane, automobile, bird, cat, deer, dog, frog, horse, ship, truck.
-          </p>
+          
         </div>
       </div>
     </>
