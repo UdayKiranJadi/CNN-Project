@@ -1,1 +1,1 @@
-# CNN-Project
+Image Classifier with TensorFlow & CNN
