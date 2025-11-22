@@ -1,0 +1,87 @@
+% File: defense-announcement-onefile.tex
+\documentclass{article}
+
+% ---- Inline project info (edit here) ----
+\def\thesistitle{Image Classifier with TensorFlow \& CNN}
+\def\studentname{Uday Kiran Jadi}
+\def\advisorname{Dr.\ Michael Soltys}
+\def\defensedatetime{3:00--4:00 pm, Thursday, Dec 4, 2025}
+\def\defensezoom{https://csuci.zoom.us/j/86192398264}
+% ----------------------------------------
+
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{float}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage[margin=0.7in]{geometry}
+\usepackage{changepage}
+\usepackage{ifthen}
+\usepackage{iftex}
+\usepackage[hidelinks]{hyperref}
+\usepackage{url}
+\usepackage[most]{tcolorbox} % boxed abstract
+
+\colorlet{grey}{gray!120}
+\pagenumbering{gobble}
+
+% A soft, clean box style
+\tcbset{
+  myabstract/.style={
+    enhanced,
+    colback=gray!3,
+    colframe=gray!35,
+    boxrule=0.6pt,
+    arc=2mm,
+    left=6mm,right=6mm,top=4mm,bottom=4mm
+  }
+}
+
+\begin{document}
+
+\begin{center}
+% Bigger logo (tries ci-logo.png, then media/ci-logo.png)
+\IfFileExists{ci-logo.png}{\includegraphics[width=0.6\textwidth]{ci-logo.png}\\}%
+{\IfFileExists{media/ci-logo.png}{\includegraphics[width=0.6\textwidth]{media/ci-logo.png}\\}{}}
+
+\hfill\break\hfill\break
+
+\LARGE \textbf{\color{grey}Computer Science Master Project Presentation}\\[2.0em]
+
+\Large {\bf \thesistitle}\\[0.6em]
+
+\large {\bf \studentname}\\[1.2em]
+\hfill\break
+\large \textit{Faculty Advisor:\\ {\bf \advisorname}}\\[1.0em]
+\end{center}
+
+\hfill\break
+% ---------- Centered, boxed Abstract ----------
+\begin{center}
+\begin{minipage}{0.9\textwidth}
+
+\begin{center}\textit{\bf Abstract}\end{center}
+\normalsize
+This project builds a compact convolutional neural network (CNN) for image classification on CIFAR\textendash10. The model comprises three convolutional blocks  with max pooling and dropout, followed by a lightweight dense head . Training is conducted in Python with TensorFlow using standard data augmentation and early stopping with checkpointing to select the best weights. The final model is exported to TensorFlow.js and deployed in a React application for fully client-side inference. On the client, images are letterboxed to 32$\times$32, and the UI reports Top-2 predictions with confidence scores. The resulting network is small enough for real-time inference in the browser on typical laptops and phones, and achieves \textbf{about 90\% validation accuracy} on CIFAR\textendash10. This demonstrates that accurate, responsive image classification can be delivered securely in the browser without server compute or data upload.
+
+\end{minipage}
+\end{center}
+% ---------------------------------------------
+
+\hfill\break
+
+\begin{center}
+\LARGE {\bf \defensedatetime}\\[0.6em]
+
+\Large
+\textbf{Zoom: }
+\href{\defensezoom}{\texttt{\defensezoom}} \quad
+
+\hfill\break
+\hfill\break
+
+\large {\bf All students and faculty are invited}\\[0.6em]
+\small {\it An Academic Affairs Event}
+\end{center}
+
+\end{document}
