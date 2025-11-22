@@ -20,7 +20,8 @@ We train a compact CNN with three convolutional blocks (Conv → BatchNorm → R
 - Block 3: Conv(3×3, 128) → BN → ReLU → Conv(3×3, 128) → ReLU → MaxPool(2×2) → Dropout(0.25)  
 - Head: Flatten (2048) → Dense(256, ReLU) → Dropout(0.5) → Dense(10, softmax)
 
-- <img width="3520" height="1216" alt="Gemini_Generated_Image_wdch5qwdch5qwdch" src="https://github.com/user-attachments/assets/4ffaa819-ea5e-4df5-8043-e6e2c6b46bc3" />
+- <img width="3520" height="1216" alt="arcitecture" src="https://github.com/user-attachments/assets/3c07f9f6-67e1-4f7e-b3eb-0605e4c07b8c" />
+
 
 
 
