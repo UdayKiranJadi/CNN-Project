@@ -83,3 +83,11 @@ venv/
 training/model/*.h5
 training/model/*.keras
 training/.cache/
+# LaTeX build outputs
+*.aux
+*.out
+*.log
+*.synctex.gz
+*.toc
+*.fls
+*.fdb_latexmk
