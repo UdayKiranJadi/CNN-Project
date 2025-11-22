@@ -1,5 +1,5 @@
-Image Classifier with TensorFlow & CNN
-# CIFAR-10 Image Classifier (React + TF.js + Keras)
+# Image Classifier with TensorFlow & CNN
+
 
 A small end‑to‑end image classification project:
 - **Training** in Python/Keras on CIFAR‑10 (32×32×3).
