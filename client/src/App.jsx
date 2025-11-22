@@ -300,7 +300,7 @@ export default function App() {
       )}
 
       <div className="header">
-        <h1>Image Classifier (React + TF.js)</h1>
+        <h1> Image Classifier </h1>
         <div className="badge">{isWarming ? "Warming…" : status}</div>
       </div>
 

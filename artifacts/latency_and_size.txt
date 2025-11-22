@@ -1,0 +1,5 @@
+Parameters: 815,018
+image_classifier_best.keras size: 12.53 MB
+image_classifier_best.h5 size: 3.17 MB
+tfjs model.json+bin size: 3.12 MB
+Latency (CPU, 1×32×32×3): 21.05 ms/inference (avg of 100)
