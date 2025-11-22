@@ -89,13 +89,7 @@ curl -I http://localhost:5173/model/model.json
 - The app preprocesses to **32×32** (contain/cover) and shows **Top‑2** predictions as percentages.
 - Status banner indicates model loading / warm‑up / inference states.
 
-## Defense / Paper
-Include:
-- `artifacts/cnn_block_diagram.png` and `artifacts/cnn_technical.png`
-- Model summary (`training/model/summary.txt`)
-- Training curves (optional): accuracy/loss vs. epoch
-- A short abstract (this README’s Abstract is suitable)
-- Links to data source: CIFAR‑10 via `tf.keras.datasets.cifar10`
+
 
 ## License
 MIT (or institution policy).
