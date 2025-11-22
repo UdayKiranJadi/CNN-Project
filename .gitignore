@@ -1,3 +1,59 @@
+# Node
+client/node_modules/
+client/.vite/
+client/dist/
+client/.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# OS / IDE
+.DS_Store
+*.swp
+.vscode/
+.idea/
+
+# Models & artifacts (keep TF.js export; ignore big temp outputs)
+training/model/*.ckpt*
+training/model/*.tmp
+artifacts/*.tmp
+
+# LaTeX build products
+docs/announcement/*.aux
+docs/announcement/*.log
+docs/announcement/*.out
+docs/announcement/*.toc
+docs/announcement/*.synctex.gz
+# Node
+client/node_modules/
+client/.vite/
+client/dist/
+client/.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# OS / IDE
+.DS_Store
+*.swp
+.vscode/
+.idea/
+
+# Models & artifacts (keep TF.js export; ignore big temp outputs)
+training/model/*.ckpt*
+training/model/*.tmp
+artifacts/*.tmp
+
+# LaTeX build products
+docs/announcement/*.aux
+docs/announcement/*.log
+docs/announcement/*.out
+docs/announcement/*.toc
+docs/announcement/*.synctex.gz
 # macOS
 .DS_Store
 
