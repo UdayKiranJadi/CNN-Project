@@ -6,7 +6,7 @@ A small end-to-end image classification project:
 - Optional webcam inference and a clean UI for upload + predictions.
 
 ## Abstract
-We train a compact CNN with three convolutional blocks (Conv → BatchNorm → ReLU, ×2 per block), max-pooling and dropout, followed by a dense head (256 → dropout → 10-way softmax). The best weights (by validation accuracy) are exported to TF.js and used in a React app for real-time inference. Final validation accuracy after fine-tuning: ~**80–81%** on CIFAR-10.
+We train a compact CNN with three convolutional blocks (Conv → BatchNorm → ReLU, ×2 per block), max-pooling and dropout, followed by a dense head (256 → dropout → 10-way softmax). The best weights (by validation accuracy) are exported to TF.js and used in a React app for real-time inference. Final validation accuracy after fine-tuning: ~**90–91%** on CIFAR-10.
 
 ## Dataset
 - **CIFAR-10** (Alex Krizhevsky, Vinod Nair, Geoffrey Hinton)  
