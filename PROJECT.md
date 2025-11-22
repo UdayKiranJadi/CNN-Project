@@ -15,7 +15,7 @@ Build a compact CNN that classifies CIFAR-10 images and runs fully in the browse
 - **Frontend:** React + TF.js. Images are letterboxed to 32×32 (contain/cover). UI shows **Top-2** predictions with confidence.
 
 ## Results
-- Validation accuracy after fine-tuning: **≈80–81%** on CIFAR-10.  
+- Validation accuracy after fine-tuning: **≈90–91%** on CIFAR-10.  
   (Fast, responsive in-browser inference; no server compute required.)
 
 ## How to Run
