@@ -16,7 +16,7 @@ We train a compact CNN with three convolutional blocks (Conv → BatchNorm → R
 - Block 3: Conv(3×3, 128) → BN → ReLU → Conv(3×3, 128) → ReLU → MaxPool(2×2) → Dropout(0.25)
 - Head: Flatten (2048) → Dense(256, ReLU) → Dropout(0.5) → Dense(10, softmax)
 
-Artifacts (generated from code):
+Diagrams:
 - `artifacts/cnn_block_diagram.png` – Block diagram
 - `artifacts/cnn_technical.png` – Technical diagram with shapes
 - `training/model/summary.txt` – Keras summary
@@ -32,7 +32,7 @@ training/
   model_creation.py        # Train from scratch on CIFAR-10
   fine_tune.py             # Resume & fine‑tune from best checkpoint
   model/                   # Saved models (.keras / .h5) + labels.json
-artifacts/                 # Diagrams exported for presentation/paper
+artifacts/                 # Diagrams exported for presentation.
 ```
 
 ## Quickstart (Frontend)
