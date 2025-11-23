@@ -34,5 +34,4 @@ Build a compact CNN that classifies CIFAR-10 images and runs fully in the browse
 - `artifacts/cnn_technical.png` (shapes/technical view)  
 - `training/model/summary.txt`, `training/model/architecture.png` (Keras)
 
-## License
-MIT .
+
