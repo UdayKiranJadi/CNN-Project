@@ -1,3 +1,4 @@
+// client: docs update
 // File: client/src/App.jsx
 
 import { useState, useRef, useEffect } from "react";
