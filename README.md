@@ -114,8 +114,6 @@ curl -I http://localhost:5173/model/model.json
 - The app preprocesses to **32×32** (contain/cover) and shows **Top-2** predictions as percentages.
 - Status banner indicates model loading / warm-up / inference states.
 
-## License
-MIT 
 
 ## Acknowledgments
 - CIFAR-10 dataset (Krizhevsky, Nair, Hinton)
