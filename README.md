@@ -31,6 +31,15 @@ We train a compact CNN with three convolutional blocks (Conv → BatchNorm → R
 - `training/model/summary.txt` – Keras summary  
 - `training/model/architecture.png` – Keras plot (requires `pydot` + `graphviz`)
 
+## Documentation
+
+- **Project description:** [`PROJECT.md`](PROJECT.md)
+- **Defense announcement (TeX):** [`docs/announcement/main.tex`](docs/announcement/main.tex)
+- **Defense announcement (PDF):** [`docs/announcement/main.pdf`](docs/announcement/main.pdf)
+
+### Repo Structure (docs & artifacts)
+
+
 ## Repo Structure
 ```
 client/                    # React + Vite app (TF.js inference)
@@ -42,6 +51,7 @@ training/
   model/                   # Saved models (.keras / .h5) + labels.json
 artifacts/                 # Diagrams exported for presentation
 ```
+
 
 ## Quickstart (Frontend)
 ```bash
