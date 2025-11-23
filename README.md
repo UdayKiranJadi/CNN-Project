@@ -37,7 +37,7 @@ We train a compact CNN with three convolutional blocks (Conv → BatchNorm → R
 - **Defense announcement (TeX):** [`docs/announcement/main.tex`](docs/announcement/main.tex)
 - **Defense announcement (PDF):** [`docs/announcement/main.pdf`](docs/announcement/main.pdf)
 
-### Repo Structure (docs & artifacts)
+
 
 
 ## Repo Structure
@@ -50,6 +50,12 @@ training/
   fine_tune.py             # Resume & fine-tune from best checkpoint
   model/                   # Saved models (.keras / .h5) + labels.json
 artifacts/                 # Diagrams exported for presentation
+docs/
+  announcement/
+    main.tex               # Defense announcement (LaTeX)
+    main.pdf               # Compiled PDF
+    ci-logo.png            # CSUCI logo for the announcement
+
 ```
 
 
